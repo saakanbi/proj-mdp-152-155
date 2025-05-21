@@ -6,7 +6,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_IMAGE = 'saakanbi/calculator-app'  // Replace with your Docker Hub repo name
+        DOCKER_IMAGE = 'wole9548/calculator-app'  // Replace with your Docker Hub repo name
         DOCKER_CREDENTIALS_ID = 'docker-hub-creds'
     }
 
