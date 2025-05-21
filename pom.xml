@@ -31,4 +31,14 @@
     <url>http://18.212.75.122:8081/nexus/content/repositories/releases</url>
   </repository>
 </distributionManagement>
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-war-plugin</artifactId>
+      <version>3.3.2</version> <!-- ✅ Java 17 compatible -->
+    </plugin>
+  </plugins>
+</build>
+
 </project>
