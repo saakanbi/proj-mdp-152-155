@@ -2,23 +2,27 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven 3.9.3'
+        maven 'Maven 3.9.3' // Make sure Jenkins is configured with this Maven version
     }
 
     environment {
         DOCKER_IMAGE = 'wole9548/calculator-app'
-        DOCKER_CREDENTIALS_ID = 'docker-hub-creds'
-        KUBECONFIG_CREDENTIALS_ID = 'kubeconfig-prod'
+        DOCKER_CREDENTIALS_ID = 'docker-hub-creds'      // Docker Hub username/password credential
+        KUBECONFIG_CREDENTIALS_ID = 'kubeconfig-prod'   // Secret file credential with kubeconfig
+    }
+
+    triggers {
+        pollSCM('H/2 * * * *') // Poll Git every 2 minutes for changes
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Clone Repository') {
             steps {
                 git branch: 'project-3', url: 'https://github.com/saakanbi/proj-mdp-152-155.git'
             }
         }
 
-        stage('Build with Maven') {
+        stage('Build WAR with Maven') {
             steps {
                 sh 'mvn clean package -DskipTests'
             }
@@ -27,7 +31,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
+                    docker.build("${DOCKER_IMAGE}:${BUILD_ID}")
                 }
             }
         }
@@ -35,8 +39,10 @@ pipeline {
         stage('Push Docker Image to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
-                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push()
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_CREDENTIALS_ID) {
+                        docker.image("${DOCKER_IMAGE}:${BUILD_ID}").push()
+                        docker.image("${DOCKER_IMAGE}:${BUILD_ID}").tag("latest")
+                        docker.image("${DOCKER_IMAGE}:latest").push()
                     }
                 }
             }
@@ -44,13 +50,15 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
-                    sh '''
-                        export KUBECONFIG=$KUBECONFIG
-                        sed -i "s|IMAGE_PLACEHOLDER|${DOCKER_IMAGE}:${BUILD_ID}|" k8s/deployment.yaml
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl apply -f k8s/service.yaml
-                    '''
+                withCredentials([file(credentialsId: KUBECONFIG_CREDENTIALS_ID, variable: 'KUBECONFIG_FILE')]) {
+                    withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
+                        sh '''
+                            echo "🛠 Deploying to Kubernetes Cluster..."
+                            kubectl apply -f k8s/deployment.yaml
+                            kubectl apply -f k8s/service.yaml
+                            kubectl rollout status deployment/calculator-app
+                        '''
+                    }
                 }
             }
         }
@@ -58,10 +66,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Build and Deployment Successful! Image: ${DOCKER_IMAGE}:${BUILD_ID}"
+            echo "✅ Build and deployment completed successfully."
         }
         failure {
-            echo "❌ Build or Deployment Failed. Check logs for details."
+            echo "❌ Build or deployment failed. Check the pipeline logs for details."
         }
     }
 }
