@@ -1,0 +1,2 @@
+cluster_name: demo.k8s.local
+kops_state_store: s3://kops-state-wole9548

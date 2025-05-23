@@ -1,0 +1,16 @@
+---
+- name: Create Kubernetes cluster using Kops
+  hosts: localhost
+  tasks:
+    - name: Create Kubernetes cluster with Kops (Gossip DNS mode)
+      shell: |
+        kops create cluster \
+          --name={{ cluster_name }} \
+          --state={{ kops_state_store }} \
+          --zones=us-east-1a,us-east-1b \
+          --node-count=2 \
+          --node-size=t3.medium \
+          --control-plane-size=t3.medium \
+          --yes
+      environment:
+        KOPS_STATE_STORE: "{{ kops_state_store }}"

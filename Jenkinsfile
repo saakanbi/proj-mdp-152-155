@@ -2,17 +2,27 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven 3.9.3'
+        maven 'Maven 3.9.3' // Make sure Jenkins is configured with this Maven version
+    }
+
+    environment {
+        DOCKER_IMAGE = 'wole9548/calculator-app'
+        DOCKER_CREDENTIALS_ID = 'docker-hub-creds'      // Docker Hub username/password credential
+        KUBECONFIG_CREDENTIALS_ID = 'kubeconfig-prod'   // Secret file credential with kubeconfig
+    }
+
+    triggers {
+        pollSCM('H/2 * * * *') // Poll Git every 2 minutes for changes
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Clone Repository') {
             steps {
-                git branch: 'project-1', url: 'https://github.com/saakanbi/proj-mdp-152-155.git'
+                git branch: 'project-3', url: 'https://github.com/saakanbi/proj-mdp-152-155.git'
             }
         }
 
-        stage('Build with Maven') {
+        stage('Build WAR with Maven') {
             steps {
                 sh 'mvn clean package -DskipTests'
             }
@@ -21,30 +31,45 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("calculator-app:${env.BUILD_ID}")
+                    docker.build("${DOCKER_IMAGE}:${BUILD_ID}")
                 }
             }
         }
 
-        stage('Run Container') {
+        stage('Push Docker Image to Docker Hub') {
             steps {
-                sh 'docker rm -f calculator || true'
-                sh 'docker run -d --name calculator -p 8080:8080 calculator-app:${BUILD_ID}'
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_CREDENTIALS_ID) {
+                        docker.image("${DOCKER_IMAGE}:${BUILD_ID}").push()
+                        docker.image("${DOCKER_IMAGE}:${BUILD_ID}").tag("latest")
+                        docker.image("${DOCKER_IMAGE}:latest").push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: KUBECONFIG_CREDENTIALS_ID, variable: 'KUBECONFIG_FILE')]) {
+                    withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
+                        sh '''
+                            echo "🛠 Deploying to Kubernetes Cluster..."
+                            kubectl apply -f k8s/deployment.yaml
+                            kubectl apply -f k8s/service.yaml
+                            kubectl rollout status deployment/calculator-app
+                        '''
+                    }
+                }
             }
         }
     }
 
     post {
-        always {
-            echo "Build completed. You can access your app at http://44.202.69.28:8080/calculator"
+        success {
+            echo "✅ Build and deployment completed successfully."
         }
         failure {
-            echo "Build failed. Check console logs for details."
+            echo "❌ Build or deployment failed. Check the pipeline logs for details."
         }
     }
 }
-// This Jenkinsfile is designed to build a Java application using Maven, create a Docker image, and run the container.
-// It includes stages for cloning the repository, building the application, creating the Docker image, and running the container.
-// The pipeline is set to run on any available agent and uses Maven 3.9.3 as the build tool.
-// The post section provides feedback on the build status and includes a link to access the application once it's running.
-// Make sure to replace <EC2_PUBLIC_IP> with the actual public IP address of your EC2 instance.

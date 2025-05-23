@@ -1,0 +1,30 @@
+---
+- name: Install AWS CLI, Kops, and Kubectl
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Install unzip and curl
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - unzip
+        - curl
+
+    - name: Install AWS CLI v2
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+
+    - name: Install kubectl
+      shell: |
+        curl -LO "https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+
+    - name: Install Kops
+      shell: |
+        curl -Lo kops https://github.com/kubernetes/kops/releases/latest/download/kops-linux-amd64
+        chmod +x kops
+        mv kops /usr/local/bin/

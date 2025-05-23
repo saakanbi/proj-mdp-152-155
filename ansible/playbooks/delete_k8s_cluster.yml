@@ -1,0 +1,9 @@
+---
+- name: Delete Kubernetes cluster using Kops
+  hosts: localhost
+  tasks:
+    - name: Delete Kops cluster
+      shell: |
+        kops delete cluster --name={{ cluster_name }} --state={{ kops_state_store }} --yes
+      environment:
+        KOPS_STATE_STORE: "{{ kops_state_store }}"
